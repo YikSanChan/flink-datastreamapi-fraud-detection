@@ -39,15 +39,19 @@ object FraudDetector {
 class FraudDetector extends KeyedProcessFunction[Long, Transaction, Alert] {
 
   @transient private var flagState: ValueState[java.lang.Boolean] = _
+  @transient private var timerState: ValueState[java.lang.Long] = _
 
   @throws[Exception]
   override def open(parameters: Configuration): Unit = {
     val flagDescriptor = new ValueStateDescriptor("flag", Types.BOOLEAN)
     flagState = getRuntimeContext.getState(flagDescriptor)
+
+    val timerDescriptor = new ValueStateDescriptor("timer-state", Types.LONG)
+    timerState = getRuntimeContext.getState(timerDescriptor)
   }
 
   @throws[Exception]
-  def processElement(
+  override def processElement(
       transaction: Transaction,
       context: KeyedProcessFunction[Long, Transaction, Alert]#Context,
       collector: Collector[Alert]): Unit = {
@@ -65,12 +69,36 @@ class FraudDetector extends KeyedProcessFunction[Long, Transaction, Alert] {
         collector.collect(alert)
       }
       // Clean up our state
-      flagState.clear()
+      cleanUp(context)
     }
 
     if (transaction.getAmount < FraudDetector.SMALL_AMOUNT) {
       // set the flag to true
       flagState.update(true)
+      val timer = context.timerService.currentProcessingTime + FraudDetector.ONE_MINUTE
+
+      context.timerService.registerProcessingTimeTimer(timer)
+      timerState.update(timer)
     }
+  }
+
+  override def onTimer(
+      timestamp: Long,
+      ctx: KeyedProcessFunction[Long, Transaction, Alert]#OnTimerContext,
+      out: Collector[Alert]): Unit = {
+    // remove flag after 1 minute
+    timerState.clear()
+    flagState.clear()
+  }
+
+  @throws[Exception]
+  private def cleanUp(ctx: KeyedProcessFunction[Long, Transaction, Alert]#Context): Unit = {
+    // delete timer
+    val timer = timerState.value
+    ctx.timerService.deleteProcessingTimeTimer(timer)
+
+    // clean up all states
+    timerState.clear()
+    flagState.clear()
   }
 }
