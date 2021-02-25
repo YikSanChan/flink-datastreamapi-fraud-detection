@@ -16,15 +16,14 @@
  * limitations under the License.
  */
 
-package spendreport
+package spendreport.datastreamapi
 
 import org.apache.flink.api.common.state.{ValueState, ValueStateDescriptor}
 import org.apache.flink.api.scala.typeutils.Types
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.util.Collector
-import org.apache.flink.walkthrough.common.entity.Alert
-import org.apache.flink.walkthrough.common.entity.Transaction
+import org.apache.flink.walkthrough.common.entity.{Alert, Transaction}
 
 /**
   * Skeleton code for implementing a fraud detector.
